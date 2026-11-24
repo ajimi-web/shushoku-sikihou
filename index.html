@@ -93,6 +93,11 @@ table.wrap td,table.wrap th{white-space:normal;text-align:left;vertical-align:to
 .lk:hover{text-decoration:underline}
 .tag{display:inline-block;font-size:11px;padding:1px 8px;border-radius:10px;background:var(--accent-soft);color:var(--accent-ink);white-space:nowrap}
 .tag.g{background:var(--soft);color:var(--ink2)}
+[hidden]{display:none!important}
+.tag.ind{background:color-mix(in srgb,var(--gc) 17%,var(--card));color:var(--ink);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gc) 50%,transparent)}
+.tag.ind:before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--gc);margin-right:5px;vertical-align:0}
+.glegend{display:flex;gap:3px 12px;flex-wrap:wrap;font-size:11.5px;color:var(--ink2);margin-top:8px}.glegend span{display:inline-flex;align-items:center;gap:5px}.glegend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.mini h3{font-size:13px;margin:10px 0 0;color:var(--ink2);font-weight:600}.mini .small{margin:0}
 .empty{color:var(--mute);padding:24px;text-align:center}
 .note{background:var(--accent-soft);border-radius:10px;padding:10px 14px;font-size:12.5px}
 .warn{background:color-mix(in srgb,var(--s4) 16%,var(--card));border-radius:10px;padding:10px 14px;font-size:12.5px}
@@ -182,6 +187,11 @@ const THIS_YEAR=new Date().getFullYear();
 const C=RAW.rows.map(r=>{const o={};RAW.keys.forEach((k,i)=>o[k]=r[i]);return o});
 const BYID=new Map(C.map(c=>[c.id,c]));
 const GROUPS=RAW.groups;
+const GCOLS=GROUPS.map((g,i)=>`hsl(${Math.round((i*137.508+20)%360)} ${i%2?72:64}% ${[46,58,40,52][i%4]}%)`);
+const IND2GRP={};for(const g of GROUPS)for(const n of (RAW.g2i[g]||[]))IND2GRP[n]=g;
+function gcol(g){const i=GROUPS.indexOf(g);return i<0?'var(--s1)':GCOLS[i]}
+function indTag(c){return `<span class="tag ind" style="--gc:${gcol(c.grp)}" title="${esc(c.grp)}">${esc(c.ind)}</span>`}
+function grpLegend(only){return `<div class="glegend">${GROUPS.filter(g=>!only||only.has(g)).map(g=>`<span><i style="background:${gcol(g)}"></i>${esc(g)}</span>`).join('')}</div>`}
 const FLAGS=[['tele',1,'テレワーク'],['house',2,'住宅補助・社宅'],['union',4,'労働組合'],['side',8,'副業可'],['wk3',16,'週休3日制'],['flex',32,'フレックス'],['disc',64,'裁量労働制'],['wk2',128,'完全週休2日']];
 const LISTINGS=['東証プライム','東証スタンダード','名証','持株会社傘下','非上場'];
 const REGIONS=['北海道','東北','関東','中部','近畿','中国','四国','九州・沖縄'];
@@ -339,7 +349,7 @@ function median(k,list){return quant(sortedVals(k,list),.5)}
    ============================================================ */
 const tip=$('#tip');
 function tipFor(c){
-  return `<b>${esc(c.name)}</b><br><span style="opacity:.75">${esc(c.ind)}</span><br>`+
+  return `<b>${esc(c.name)}</b><br><span style="opacity:.85"><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${gcol(c.grp)};margin-right:4px"></i>${esc(c.ind)}</span><br>`+
     `平均年収 ${fmtV('salary',c.salary)} / 初任給 ${fmtV('start',c.start)}<br>残業 ${fmtV('ot',c.ot)} / 3年後離職率 ${fmtV('turnCur',c.turnCur)}`;
 }
 document.addEventListener('mouseover',e=>{
@@ -409,8 +419,8 @@ function scatterSVG(list,xk,yk,o){
   const draw=(p,cls)=>{
     const c=p.c,cx=X(p.x).toFixed(1),cy=Y(p.y).toFixed(1);
     if(cls==='dim')return `<circle cx="${cx}" cy="${cy}" r="2.6" fill="var(--dim)" fill-opacity=".55" data-tipid="${c.id}" data-open="${c.id}"/>`;
-    if(cls==='hl')return `<circle cx="${cx}" cy="${cy}" r="4.2" fill="var(--s2)" fill-opacity=".85" stroke="var(--card)" stroke-width="1" data-tipid="${c.id}" data-open="${c.id}"/>`;
-    return `<circle cx="${cx}" cy="${cy}" r="3.4" fill="var(--s1)" fill-opacity=".55" stroke="var(--card)" stroke-width=".6" data-tipid="${c.id}" data-open="${c.id}"/>`;
+    if(cls==='hl')return `<circle cx="${cx}" cy="${cy}" r="4.2" fill="${o.byGrp?gcol(c.grp):'var(--s2)'}" fill-opacity=".9" stroke="var(--card)" stroke-width="1" data-tipid="${c.id}" data-open="${c.id}"/>`;
+    return `<circle cx="${cx}" cy="${cy}" r="3.6" fill="${o.byGrp?gcol(c.grp):'var(--s1)'}" fill-opacity="${o.byGrp?.72:.55}" stroke="var(--card)" stroke-width=".6" data-tipid="${c.id}" data-open="${c.id}"/>`;
   };
   if(hl){d.forEach(p=>{if(!inHl(p.c)&&!marks.has(p.c.id))s+=draw(p,'dim')});d.forEach(p=>{if(inHl(p.c)&&!marks.has(p.c.id))s+=draw(p,'hl')})}
   else d.forEach(p=>{if(!marks.has(p.c.id))s+=draw(p,'base')});
@@ -459,7 +469,7 @@ function histSVG(sv,k,markers){
 function hbarSVG(items,o){
   o=o||{};
   if(!items.length)return '<p class="empty">表示できるデータがありません。</p>';
-  const rh=o.rh||25,lw=o.lw||200,W=o.w||780,rw=o.rw||96,H=items.length*rh+(o.marker!=null?24:6);
+  const rh=o.rh||25,lw=o.nolabel?6:(o.lw||200),W=o.w||780,rw=o.rw||96,H=items.length*rh+(o.marker!=null?24:6);
   let lo=Math.min(0,...items.map(i=>i.value)),hi=Math.max(...items.map(i=>i.value));
   if(isNum(o.marker))hi=Math.max(hi,o.marker);if(hi<=lo)hi=lo+1;
   const X=v=>lw+(v-lo)/(hi-lo)*(W-lw-rw);
@@ -467,8 +477,8 @@ function hbarSVG(items,o){
   items.forEach((it,i)=>{
     const y=i*rh+3,wd=Math.max(2,Math.abs(X(it.value)-X(0))),xa=Math.min(X(0),X(it.value));
     const at=it.id?` data-open="${it.id}"`:(it.go?` data-go="${esc(it.go)}"`:'');
-    const lab=it.label.length>17?it.label.slice(0,16)+'…':it.label;
-    s+=`<g${at}><text x="${lw-8}" y="${y+rh/2+3}" text-anchor="end" style="font-size:12px" data-tip="${esc(it.label)}">${esc(lab)}</text>`;
+    const mc=o.maxc||17,lab=it.label.length>mc?it.label.slice(0,mc-1)+'…':it.label;
+    s+=`<g${at}>${o.nolabel?'':`<text x="${lw-8}" y="${y+rh/2+3}" text-anchor="end" style="font-size:12px" data-tip="${esc(it.label)}">${esc(lab)}</text>`}`;
     s+=`<rect x="${xa}" y="${y+3}" width="${wd}" height="${rh-9}" rx="4" fill="${it.color||'var(--s1)'}" fill-opacity="${it.dim?.3:.85}" data-tip="${esc(it.tip||it.label+'<br><b>'+it.text+'</b>')}"/>`;
     s+=`<text x="${Math.max(X(0),X(it.value))+7}" y="${y+rh/2+3}" style="font-size:11.5px;font-weight:600">${esc(it.text)}</text></g>`;
   });
@@ -492,10 +502,10 @@ function boxSVG(groups,k,o){
   groups.forEach((g,i)=>{
     const y=P.t+i*rh,cy=y+rh/2,v=g.vals,q1=quant(v,.25),md=quant(v,.5),q3=quant(v,.75),iq=q3-q1;
     const wl=v[lowerBound(v,q1-1.5*iq)],wh=v[upperBound(v,q3+1.5*iq)-1];
-    const sel=o.sel&&o.sel===g.key,col=sel?'var(--s2)':'var(--s1)';
+    const sel=o.sel&&o.sel===g.key,col=g.color||'var(--s1)';
     const tp=`<b>${esc(g.label)}</b>(${N(v.length)}社)<br>中央値 ${esc(fmtV(k,md))}<br>上位25% ${esc(fmtV(k,q3))} / 下位25% ${esc(fmtV(k,q1))}`;
     s+=`<g${g.go?` data-go="${esc(g.go)}"`:''} data-tip="${tp}" opacity="${o.sel&&!sel?.6:1}"><text x="${lw-8}" y="${cy+4}" text-anchor="end" style="font-size:12px;${sel?'font-weight:700':''}">${esc(g.label.length>14?g.label.slice(0,13)+'…':g.label)}</text>`;
-    s+=`<line x1="${X(wl)}" x2="${X(wh)}" y1="${cy}" y2="${cy}" stroke="${col}" stroke-width="1.5"/><rect x="${X(q1)}" y="${cy-8}" width="${Math.max(3,X(q3)-X(q1))}" height="16" rx="4" fill="${col}" fill-opacity=".35" stroke="${col}"/><line x1="${X(md)}" x2="${X(md)}" y1="${cy-8}" y2="${cy+8}" stroke="${col}" stroke-width="3"/></g>`;
+    s+=`<line x1="${X(wl)}" x2="${X(wh)}" y1="${cy}" y2="${cy}" stroke="${col}" stroke-width="1.5"/><rect x="${X(q1)}" y="${cy-8}" width="${Math.max(3,X(q3)-X(q1))}" height="16" rx="4" fill="${col}" fill-opacity="${sel?.6:.35}" stroke="${col}" stroke-width="${sel?2.5:1}"/><line x1="${X(md)}" x2="${X(md)}" y1="${cy-8}" y2="${cy+8}" stroke="${col}" stroke-width="3"/></g>`;
   });
   return s+'</svg>';
 }
@@ -607,7 +617,7 @@ $('#cmpchip').onclick=()=>go('compare');
     const t=normName(inp.value);
     if(!t){sug.hidden=true;return}
     items=C.filter(c=>c.nk.includes(t)).sort((a,b)=>a.nk.indexOf(t)-b.nk.indexOf(t)||(b.emp||0)-(a.emp||0)).slice(0,10);
-    sug.innerHTML=items.map((c,i)=>`<div data-sid="${c.id}" class="${i===act?'act':''}"><span>${esc(c.name)}</span><small>${esc(c.ind)}</small></div>`).join('')||'<div><small>該当する企業がありません</small></div>';
+    sug.innerHTML=items.map((c,i)=>`<div data-sid="${c.id}" class="${i===act?'act':''}"><span>${esc(c.name)}</span><small>${indTag(c)}</small></div>`).join('')||'<div><small>該当する企業がありません</small></div>';
     sug.hidden=false;
   }
   inp.addEventListener('input',()=>{act=-1;show()});
@@ -737,7 +747,7 @@ function openDetail(id,tab){
   tab=tab||openDetail.tab||'ov';openDetail.tab=tab;openDetail.id=id;
   const tabs=[['ov','概要'],['pay','待遇・働き方'],['hire','採用'],['biz','業績']];
   const body={ov:detailOverview,pay:detailPay,hire:detailHire,biz:detailBiz}[tab](c);
-  $('#mbox').innerHTML=`<div class="mhd"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap"><div><h3>${esc(c.name)}</h3><div class="small">${esc(c.kana||'')}</div><div class="chips"><span class="tag">${esc(c.grp)}</span><span class="tag g">${esc(c.ind)}</span><span class="tag g">${esc(c.listing)}${c.code?' '+esc(c.code):''}</span> ${dots(c.disc)}</div></div>
+  $('#mbox').innerHTML=`<div class="mhd"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap"><div><h3>${esc(c.name)}</h3><div class="small">${esc(c.kana||'')}</div><div class="chips"><span class="tag ind" style="--gc:${gcol(c.grp)}">${esc(c.grp)}</span>${indTag(c)}<span class="tag g">${esc(c.listing)}${c.code?' '+esc(c.code):''}</span> ${dots(c.disc)}</div></div>
     <div style="display:flex;gap:8px"><button class="btn pri" data-cmpbtn="${c.id}">比較リストに追加</button><button class="btn" id="mclose">閉じる ✕</button></div></div>
     <div class="mtabs">${tabs.map(t=>`<button data-mt="${t[0]}" class="${t[0]===tab?'on':''}">${t[1]}</button>`).join('')}</div></div><div class="mbd">${body}</div>`;
   $('#modal').hidden=false;document.body.style.overflow='hidden';
@@ -773,12 +783,12 @@ VIEWS.dash=function(){
   <div class="kpis"><div class="kpi"><div class="l">掲載企業数</div><div class="v">${N(C.length)}社</div><div class="s">${catList('grp').length}大分類・${catList('ind').length}業種</div></div>
     ${['salary','start','ot','paidRate','turnCur','tenure','fRatio'].map(kp).join('')}</div>
   <div class="grid2">
-    <div class="card"><h2>業種別の掲載企業数</h2><p class="sub">バーをクリックすると、その業種の分析に移動します。</p><div style="margin-bottom:8px">${lvlPills('d-lv',s.ilvl)}</div><div class="chart" id="d-ind"></div></div>
+    <div class="card"><h2>業種別の掲載企業数</h2><p class="sub">バーをクリックすると、その業種の分析に移動します。</p><div style="margin-bottom:8px">${lvlPills('d-lv',s.ilvl)}</div><div class="chart" id="d-ind"></div><div id="d-indleg"></div></div>
     <div class="card"><h2>指標の分布</h2><p class="sub">企業ごとの値のばらつきです。破線は中央値。</p>
       <div class="row"><label class="field">指標${mSel('d-hm',s.hm)}</label><label class="field">対象<select id="d-hname">${grpOpts(s.hname)}</select></label></div>
       <div id="d-hstat" class="small" style="margin-bottom:6px"></div><div class="chart" id="d-hist"></div></div>
   </div>
-  <div class="card" id="d-sc-card"><h2>散布図で2つの指標の関係を見る</h2><p class="sub">点にカーソルを合わせると企業名、クリックで詳細が開きます。青=全企業、橙=強調した業種、色付きの大きな点=比較リストの企業。</p>
+  <div class="card" id="d-sc-card"><h2>散布図で2つの指標の関係を見る</h2><p class="sub">点にカーソルを合わせると企業名、クリックで詳細が開きます。点の色は大分類(下の凡例)、色付きの大きな点=比較リストの企業。強調を選ぶと他の業種は灰色になります。</p>
     <div class="row"><label class="field">横軸${mSel('d-x',s.x)}</label><label class="field">縦軸${mSel('d-y',s.y)}</label>
       <label class="field">強調する大分類<select id="d-shl">${grpOpts(s.shl,'(強調なし)')}</select></label>
       <label class="field inl"><input type="checkbox" id="d-clip" ${s.clip?'checked':''}>外れ値(上下1%)を除く</label>
@@ -789,12 +799,13 @@ VIEWS.dash=function(){
       <div class="pills" id="d-pre" style="margin-bottom:10px">${RANK_PRESETS.map((p,i)=>`<button class="pill" data-pre="${i}">${p[2]}</button>`).join('')}</div>
       <div class="row"><label class="field">指標${mSel('d-rm',s.rm)}</label><label class="field">順序<select id="d-rdir"><option value="desc"${s.rdir==='desc'?' selected':''}>大きい順</option><option value="asc"${s.rdir==='asc'?' selected':''}>小さい順</option></select></label>
       <label class="field">大分類<select id="d-rname">${grpOpts(s.rname)}</select></label><label class="field">件数<select id="d-rn">${[10,15,20,30,50].map(n=>`<option${n===s.rn?' selected':''}>${n}</option>`).join('')}</select></label></div>
-      <div class="chart" id="d-rank"></div></div>
+      <div class="chart" id="d-rank"></div><div id="d-rankleg"></div></div>
     <div class="card"><h2>指標どうしの相関</h2><p class="sub">ピアソン相関係数(青=正、赤=負)。マスをクリックすると散布図に反映します。</p><div id="d-corr" class="tw free" style="overflow:auto"></div></div>
   </div>`;
   const upI=()=>{
     const arr=catList(s.ilvl);
-    $('#d-ind').innerHTML=hbarSVG(arr.map(o=>({label:o.name,value:o.list.length,text:N(o.list.length)+'社',go:'industry::'+JSON.stringify({lvl:s.ilvl,sel:o.name})})),{lw:200,rh:s.ilvl==='ind'?21:25});
+    $('#d-ind').innerHTML=hbarSVG(arr.map(o=>({label:o.name,value:o.list.length,text:N(o.list.length)+'社',color:gcol(s.ilvl==='ind'?IND2GRP[o.name]:o.name),go:'industry::'+JSON.stringify({lvl:s.ilvl,sel:o.name})})),{lw:200,rh:s.ilvl==='ind'?21:25});
+    $('#d-indleg').innerHTML=s.ilvl==='ind'?grpLegend():'';
     $$('#d-lv .pill').forEach(b=>b.classList.toggle('on',b.dataset.lvl===s.ilvl));
   };
   wirePills('d-lv',l=>{s.ilvl=l;upI()});
@@ -806,14 +817,15 @@ VIEWS.dash=function(){
   };
   const upS=()=>{
     s.x=$('#d-x').value;s.y=$('#d-y').value;s.shl=$('#d-shl').value;s.clip=$('#d-clip').checked;s.reg=$('#d-reg').checked;
-    const r=scatterSVG(C,s.x,s.y,{clip:s.clip,reg:s.reg,hl:s.shl?{lvl:'grp',name:s.shl}:null,marks:CMP});
-    $('#d-sc').innerHTML=r.svg;
+    const r=scatterSVG(C,s.x,s.y,{clip:s.clip,reg:s.reg,byGrp:true,hl:s.shl?{lvl:'grp',name:s.shl}:null,marks:CMP});
+    $('#d-sc').innerHTML=r.svg+(s.shl?'':grpLegend());
     $('#d-sstat').innerHTML=r.r==null?'':`表示 ${N(r.n)}社 ／ 相関係数 r = <b>${r.r.toFixed(2)}</b>(${corrWord(r.r)})`;
   };
   const upR=()=>{
     s.rm=$('#d-rm').value;s.rdir=$('#d-rdir').value;s.rname=$('#d-rname').value;s.rn=+$('#d-rn').value;
     const p=poolGrp(s.rname).filter(c=>isNum(c[s.rm])).sort((a,b)=>s.rdir==='desc'?b[s.rm]-a[s.rm]:a[s.rm]-b[s.rm]).slice(0,s.rn);
-    $('#d-rank').innerHTML=hbarSVG(p.map(c=>({label:c.name,value:c[s.rm],text:fmtV(s.rm,c[s.rm]),id:c.id,tip:tipFor(c)})),{lw:210});
+    $('#d-rank').innerHTML=hbarSVG(p.map(c=>({label:c.name,value:c[s.rm],text:fmtV(s.rm,c[s.rm]),id:c.id,color:gcol(c.grp),tip:tipFor(c)})),{lw:210});
+    $('#d-rankleg').innerHTML=grpLegend(new Set(p.map(c=>c.grp)));
   };
   ['d-hm','d-hname'].forEach(i=>$('#'+i).onchange=upH);
   ['d-x','d-y','d-shl','d-clip','d-reg'].forEach(i=>$('#'+i).onchange=upS);
@@ -961,7 +973,7 @@ function renderResults(){
   const th=(k,l,cl)=>`<th class="${cl||''}" data-sort="${k}">${l}${s.sort===k?(s.dir==='asc'?' ▲':' ▼'):''}</th>`;
   let h='<table class="t"><thead><tr>'+th('name','会社名','l stick')+th('ind','業種','l')+cols.map(k=>th(k,SPECIAL_H[k]||hdr(k),SPECIAL_H[k]&&k!=='founded'?'l':'')).join('')+'</tr></thead><tbody>';
   for(const c of show){
-    h+=`<tr><td class="name stick"><label style="display:inline-flex;gap:7px;align-items:center"><input type="checkbox" data-cmpbtn="${c.id}" title="比較リストに追加"><span class="lk" data-open="${c.id}">${esc(c.name)}</span></label></td><td class="l"><span class="tag g" title="${esc(c.grp)}">${esc(c.ind)}</span></td>`+cols.map(k=>cellHTML(c,k)).join('')+'</tr>';
+    h+=`<tr><td class="name stick"><label style="display:inline-flex;gap:7px;align-items:center"><input type="checkbox" data-cmpbtn="${c.id}" title="比較リストに追加"><span class="lk" data-open="${c.id}">${esc(c.name)}</span></label></td><td class="l">${indTag(c)}</td>`+cols.map(k=>cellHTML(c,k)).join('')+'</tr>';
   }
   if(!show.length)h+=`<tr><td colspan="${cols.length+2}" class="empty">該当する企業がありません。条件を緩めてください。</td></tr>`;
   $('#s-tw').innerHTML=h+'</tbody></table>';
@@ -1010,7 +1022,7 @@ VIEWS.industry=function(){
   };
   const upBox=()=>{
     s.bm=$('#i-bm').value;
-    const g=cats().map(o=>({label:o.name,vals:cv(s.bm,s.lvl,o.name),key:o.name,go:'industry::'+JSON.stringify({sel:o.name})}));
+    const g=cats().map(o=>({label:o.name,vals:cv(s.bm,s.lvl,o.name),key:o.name,color:gcol(s.lvl==='ind'?IND2GRP[o.name]:o.name),go:'industry::'+JSON.stringify({sel:o.name})}));
     g.sort((a,b)=>{const A=a.vals.length>=5,B=b.vals.length>=5;if(A!==B)return A?-1:1;if(!A)return 0;const d=quant(b.vals,.5)-quant(a.vals,.5);return M[s.bm].dir<0?-d:d});
     $('#i-box').innerHTML=boxSVG(g,s.bm,{sel:s.sel});
   };
@@ -1034,7 +1046,7 @@ VIEWS.industry=function(){
     const upRk=()=>{
       s.sm=$('#i-sm').value;
       const p=L.filter(c=>isNum(c[s.sm])).sort((a,b)=>M[s.sm].dir<0?a[s.sm]-b[s.sm]:b[s.sm]-a[s.sm]).slice(0,20);
-      $('#i-rank').innerHTML=hbarSVG(p.map(c=>({label:c.name,value:c[s.sm],text:fmtV(s.sm,c[s.sm]),id:c.id,tip:tipFor(c)})),{lw:200,rh:24});
+      $('#i-rank').innerHTML=hbarSVG(p.map(c=>({label:c.name,value:c[s.sm],text:fmtV(s.sm,c[s.sm]),id:c.id,color:gcol(c.grp),tip:tipFor(c)})),{lw:200,rh:24});
     };
     $('#i-sm').onchange=upRk;upRk();
     $('#i-search').onclick=()=>openSearch(s.lvl==='grp'?{grp:s.sel}:{ind:s.sel});
@@ -1049,6 +1061,7 @@ VIEWS.industry=function(){
    企業比較
    ============================================================ */
 const CMP_ROWS=['salary','sal30','start','bonusAmt','wGrow','ot','paidRate','tenure','turnCur','age','fRatio','tenRatio','emp','hires','rev','opm','revG'];
+const CSETS=[['3年後離職率(今年・前年・全社)',['turnCur','turnPrev','quitRate']],['ボーナス(年間・月数)',['bonusAmt','bonusMonths']],['賃金(年収・30歳・初任給)',['salary','sal30','start','startMin']],['賃金カーブ(25・30・35歳)',['w25','w30','w35','wGrow']],['残業・有給',['ot','paidRate','paidTaken']],['勤続・年齢・女性活躍',['tenure','age','fRatio','tenRatio']],['採用数の推移(24・25・26年)',['h24','h25','h26','hiresChg']],['業績(売上・利益)',['rev','op','pretax','net']],['収益性・成長',['opm','netm','revG']],['自由に選ぶ(4指標)',null]];
 const RADAR=[['salary','平均年収'],['start','初任給'],['ot','残業の少なさ'],['turnCur','定着率'],['paidRate','有給取得率'],['tenure','勤続年数'],['fRatio','女性比率'],['opm','営業利益率']];
 VIEWS.compare=renderCompare;
 function renderCompare(){
@@ -1066,14 +1079,14 @@ function renderCompare(){
     $('#view').innerHTML=h;wireCompare();return;
   }
   const cs=CMP.map(id=>BYID.get(id));
-  h+=`<div class="card"><h2>比較表</h2><p class="sub">緑の網掛け(◎)=選んだ企業の中で最も良い値、赤の網掛け(▽)=最も悪い値。小さな文字は同じ業種の中での順位。右端は全企業の中央値です。</p><div class="tw free" style="overflow:auto"><table class="t"><thead><tr><th class="l nos stick">指標</th>${cs.map((c,i)=>`<th class="nos" style="white-space:normal;min-width:118px;text-align:right"><span class="lk" data-open="${c.id}" style="color:var(--ink)"><i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${CCOL[i]};margin-right:5px"></i>${esc(c.name)}</span><small>${esc(c.ind)}</small></th>`).join('')}<th class="nos">全体の中央値</th></tr></thead><tbody>`;
+  h+=`<div class="card"><h2>比較表</h2><p class="sub">緑の網掛け=選んだ企業の中で最も良い値、赤の網掛け=最も悪い値。小さな文字は同じ業種の中での順位。右端は全企業の中央値です。</p><div class="tw free" style="overflow:auto"><table class="t"><thead><tr><th class="l nos stick">指標</th>${cs.map((c,i)=>`<th class="nos" style="white-space:normal;min-width:118px;text-align:right"><span class="lk" data-open="${c.id}" style="color:var(--ink)"><i style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${CCOL[i]};margin-right:5px"></i>${esc(c.name)}</span><small>${indTag(c)}</small></th>`).join('')}<th class="nos">全体の中央値</th></tr></thead><tbody>`;
   for(const k of CMP_ROWS){
     const ok=cs.map(c=>c[k]).filter(isNum);let best=null,worst=null;
     if(M[k].dir!==0&&ok.length>=2){best=M[k].dir>0?Math.max(...ok):Math.min(...ok);worst=M[k].dir>0?Math.min(...ok):Math.max(...ok);if(best===worst)best=worst=null}
     h+=`<tr><td class="l stick">${esc(M[k].label)}</td>`;
     cs.forEach(c=>{
       const v=c[k];if(!isNum(v)){h+='<td class="na">—</td>';return}
-      const cl=v===best?'best':v===worst?'worst':'',mk=v===best?'◎ ':v===worst?'▽ ':'',p=peerOf(c,k),ri=rankIn(k,v,p.a);
+      const cl=v===best?'best':v===worst?'worst':'',mk='',p=peerOf(c,k),ri=rankIn(k,v,p.a);
       h+=`<td class="${cl}">${mk}${esc(fmtV(k,v))}<br><span style="font-size:10.5px;font-weight:400;opacity:.75">${esc(p.label)}内 ${N(ri.rank)}/${N(ri.n)}位</span></td>`;
     });
     h+=`<td style="color:var(--mute)">${esc(fmtV(k,quant(gv(k),.5)))}</td></tr>`;
@@ -1082,7 +1095,7 @@ function renderCompare(){
   const series=cs.map((c,i)=>({name:c.name,color:CCOL[i],vals:RADAR.map(a=>isNum(c[a[0]])?Math.round(pctIn(a[0],c[a[0]],gv(a[0]))*100):null)}));
   const leg=`<div class="legend">${cs.map((c,i)=>`<span><i style="background:${CCOL[i]}"></i>${esc(c.name)}</span>`).join('')}</div>`;
   h+=`<div class="grid2"><div class="card"><h2>総合バランス(レーダーチャート)</h2><p class="sub">各指標の「全企業の中での位置」を100点満点で表示(100=最も良い側)。残業・離職率は少ないほど高得点。データなしは0点の位置に描画します。</p><div class="chart">${radarSVG(RADAR.map(a=>a[1]),series)}</div>${leg}</div>
-    <div class="card"><h2>指標別の比較</h2><p class="sub">破線は全企業の中央値です。</p><div class="row"><label class="field">指標${mSel('c-bm',s.bm)}</label></div><div class="chart" id="c-bar"></div></div></div>
+    <div class="card"><h2>指標別の比較</h2><p class="sub">似た指標をまとめて表示します。破線は全企業の中央値です。</p><div class="row"><label class="field">指標セット<select id="c-set">${CSETS.map((x,i)=>`<option value="${i}"${i===(s.set||0)?' selected':''}>${x[0]}</option>`).join('')}</select></label></div><div id="c-custom" class="row" hidden>${[0,1,2,3].map(i=>`<label class="field">指標${i+1}${mSel('c-cm'+i,(s.cm||[])[i]||CSETS[0][1][i%CSETS[0][1].length])}</label>`).join('')}</div><div class="chart" id="c-bar"></div></div></div>
   <div class="grid2"><div class="card"><h2>賃金カーブ(25・30・35歳)</h2><p class="sub">3時点のうち2つ以上データがある企業のみ。単位は円。</p><div class="chart" id="c-wc"></div>${leg}</div>
     <div class="card"><h2>採用数の推移(24〜26年入社)</h2><p class="sub">単位は人。</p><div class="chart" id="c-hc"></div>${leg}</div></div>
   <div class="card"><h2>制度・働き方・特色の比較</h2><div class="tw free" style="overflow:auto"><table class="t wrap"><thead><tr><th class="nos stick" style="min-width:90px">項目</th>${cs.map(c=>`<th class="nos" style="min-width:200px">${esc(c.name)}</th>`).join('')}</tr></thead><tbody>`;
@@ -1091,10 +1104,11 @@ function renderCompare(){
   h+=`</tbody></table></div></div>`;
   $('#view').innerHTML=h;wireCompare();
   const upB=()=>{
-    s.bm=$('#c-bm').value;const k=s.bm;
-    $('#c-bar').innerHTML=hbarSVG(cs.map((c,i)=>({label:c.name,value:isNum(c[k])?c[k]:0,text:fmtV(k,c[k]),color:CCOL[i],id:c.id,dim:!isNum(c[k])})),{lw:180,rh:36,marker:quant(gv(k),.5),markerLabel:'全体の中央値'});
+    s.set=+$('#c-set').value;const cu=CSETS[s.set][1]===null;$('#c-custom').hidden=!cu;
+    let ks;if(cu){s.cm=[0,1,2,3].map(i=>$('#c-cm'+i).value);ks=[...new Set(s.cm)]}else ks=CSETS[s.set][1];
+    $('#c-bar').innerHTML=ks.map(k=>`<div class="mini"><h3>${esc(M[k].label)} <span class="small">(${esc(unitLabel(k))}${M[k].dir<0?'・低いほど良い':M[k].dir>0?'・高いほど良い':''})</span></h3>${hbarSVG(cs.map((c,i)=>({label:c.name,value:isNum(c[k])?c[k]:0,text:isNum(c[k])?fmtV(k,c[k]):'データなし',color:CCOL[i],id:c.id,dim:!isNum(c[k])})),{lw:150,maxc:11,w:540,rw:92,rh:cs.length>4?26:30,marker:quant(gv(k),.5),markerLabel:'中央値 '+fmtV(k,quant(gv(k),.5))})}</div>`).join('');
   };
-  $('#c-bm').onchange=upB;upB();
+  $('#c-set').onchange=upB;[0,1,2,3].forEach(i=>{const e=$('#c-cm'+i);if(e)e.onchange=upB});upB();
   $('#c-wc').innerHTML=lineSVG(cs.map((c,i)=>({name:c.name,color:CCOL[i],vals:[c.w25,c.w30,c.w35]})).filter(x=>x.vals.filter(isNum).length>=2),['25歳','30歳','35歳'],null,{w:560,h:300,rpad:90,tick:v=>N(v),vfmt:v=>N(v)+'円'});
   $('#c-hc').innerHTML=lineSVG(cs.map((c,i)=>({name:c.name,color:CCOL[i],vals:[c.h24,c.h25,c.h26]})).filter(x=>x.vals.filter(isNum).length>=2),['24年','25年','26年'],null,{w:560,h:300,rpad:90,tick:v=>N(v),vfmt:v=>N(v)+'人'});
 }
@@ -1105,7 +1119,7 @@ function wireCompare(){
   const show=()=>{
     const t=normName(q.value);s.q=q.value;if(!t){sug.hidden=true;return}
     items=C.filter(c=>c.nk.includes(t)&&!CMP.includes(c.id)).sort((a,b)=>a.nk.indexOf(t)-b.nk.indexOf(t)||(b.emp||0)-(a.emp||0)).slice(0,8);
-    sug.innerHTML=items.map((c,i)=>`<div data-sid="${c.id}" class="${i===act?'act':''}"><span>${esc(c.name)}</span><small>${esc(c.ind)}</small></div>`).join('')||'<div><small>該当なし</small></div>';sug.hidden=false;
+    sug.innerHTML=items.map((c,i)=>`<div data-sid="${c.id}" class="${i===act?'act':''}"><span>${esc(c.name)}</span><small>${indTag(c)}</small></div>`).join('')||'<div><small>該当なし</small></div>';sug.hidden=false;
   };
   const pick=id=>{s.q='';toggleCmp(id)};
   q.oninput=()=>{act=-1;show()};
@@ -1140,6 +1154,7 @@ VIEWS.wage=function(){
       <div id="w-pos" class="small" style="margin-bottom:6px"></div><div class="chart" id="w-hist"></div></div>
     <div class="card"><h2>大分類ごとの賃金分布</h2><p class="sub">中央値の高い順(5社以上の大分類)。</p><div class="chart" id="w-box"></div></div>
   </div>
+  <div class="card" style="padding:10px 18px"><div class="small" style="margin:0">棒・点の色は大分類を表します</div><div id="w-leg"></div></div>
   <div class="grid2"><div class="card"><h2>賃金が高い企業 TOP20</h2><div class="chart" id="w-top"></div></div><div class="card"><h2>賃金が低い企業 TOP20</h2><div class="chart" id="w-bot"></div></div></div>
   <div class="grid2"><div class="card"><h2>賃金と勤続年数</h2><p class="sub">長く勤める人が多い企業ほど賃金が高いかを確認できます。</p><div class="chart" id="w-s1"></div></div>
     <div class="card"><h2>賃金と残業時間</h2><p class="sub">高い賃金と長時間労働の関係を確認できます。</p><div class="chart" id="w-s2"></div></div></div>
@@ -1158,14 +1173,15 @@ VIEWS.wage=function(){
       $('#w-pos').innerHTML=sv.length?`入力した値は、${esc(s.name||'全企業')}の${N(sv.length)}社中 <b>上位 ${N((hi+eq/2)/sv.length*100,1)}%</b> に相当します(これより高い企業は${N(hi)}社)。単位は${esc(unitLabel(k))}。`:'';
     }else $('#w-pos').innerHTML='';
     $('#w-hist').innerHTML=histSVG(sv,k,mk);
-    const g=catList('grp').map(o=>({label:o.name,vals:sortedVals(k,o.list.filter(c=>p.includes(c))),key:o.name,go:'industry::'+JSON.stringify({sel:o.name,lvl:'grp'})})).filter(x=>x.vals.length>=5).sort((a,b)=>quant(b.vals,.5)-quant(a.vals,.5));
+    const g=catList('grp').map(o=>({label:o.name,vals:sortedVals(k,o.list.filter(c=>p.includes(c))),key:o.name,color:gcol(o.name),go:'industry::'+JSON.stringify({sel:o.name,lvl:'grp'})})).filter(x=>x.vals.length>=5).sort((a,b)=>quant(b.vals,.5)-quant(a.vals,.5));
     $('#w-box').innerHTML=boxSVG(g,k,{sel:s.name});
-    const L=p.filter(c=>isNum(c[k])).sort((a,b)=>b[k]-a[k]),mkI=c=>({label:c.name,value:c[k],text:fmtV(k,c[k]),id:c.id,tip:tipFor(c)});
+    const L=p.filter(c=>isNum(c[k])).sort((a,b)=>b[k]-a[k]),mkI=c=>({label:c.name,value:c[k],text:fmtV(k,c[k]),id:c.id,color:gcol(c.grp),tip:tipFor(c)});
     $('#w-top').innerHTML=hbarSVG(L.slice(0,20).map(mkI),{lw:200,rh:23,w:660});
     $('#w-bot').innerHTML=hbarSVG(L.slice(-20).reverse().map(mkI),{lw:200,rh:23,w:660});
-    const sc=(id,xk,yk)=>{const r=scatterSVG(p,xk,yk,{clip:true,reg:true,marks:CMP});$(id).innerHTML=r.svg+(r.r==null?'':`<div class="small">表示${N(r.n)}社 ／ 相関係数 r = <b>${r.r.toFixed(2)}</b>(${corrWord(r.r)})</div>`)};
+    $('#w-leg').innerHTML=grpLegend();
+    const sc=(id,xk,yk)=>{const r=scatterSVG(p,xk,yk,{clip:true,reg:true,byGrp:true,marks:CMP});$(id).innerHTML=r.svg+(r.r==null?'':`<div class="small">表示${N(r.n)}社 ／ 相関係数 r = <b>${r.r.toFixed(2)}</b>(${corrWord(r.r)})</div>`)};
     sc('#w-s1','tenure',k);sc('#w-s2','ot',k);
-    const r3=scatterSVG(poolGrp(s.name),'w25','w35',{clip:true,reg:true,marks:CMP});$('#w-s3').innerHTML=r3.svg+(r3.r==null?'':`<div class="small">表示${N(r3.n)}社 ／ 相関係数 r = <b>${r3.r.toFixed(2)}</b></div>`);
+    const r3=scatterSVG(poolGrp(s.name),'w25','w35',{clip:true,reg:true,byGrp:true,marks:CMP});$('#w-s3').innerHTML=r3.svg+(r3.r==null?'':`<div class="small">表示${N(r3.n)}社 ／ 相関係数 r = <b>${r3.r.toFixed(2)}</b></div>`);
   };
   $('#w-m').onchange=up;$('#w-name').onchange=up;bindNum($('#w-val'),()=>{s.val=$('#w-val').value;up()});
   $$('#w-scopebox [data-sc]').forEach(b=>b.onclick=()=>{s.scope=b.dataset.sc;up()});
@@ -1251,7 +1267,7 @@ VIEWS.score=function(){
     $('#sc-note').innerHTML=`<b>${N(res.length)}</b>社が条件を満たしました(重みを付けた指標のデータがそろっている割合が${s.minCov}%以上)。点数は0〜100で、100に近いほど条件に合う側です。`;
     let h='<table class="t"><thead><tr><th class="nos">順位</th><th class="l nos stick">会社名</th><th class="l nos">業種</th><th class="nos">点数</th><th class="nos">データ充足</th>'+act.map(([k])=>`<th class="nos">${hdr(k)}</th>`).join('')+'</tr></thead><tbody>';
     show.forEach((r,i)=>{
-      h+=`<tr><td>${N(i+1)}</td><td class="name stick"><label style="display:inline-flex;gap:7px;align-items:center"><input type="checkbox" data-cmpbtn="${r.c.id}"><span class="lk" data-open="${r.c.id}">${esc(r.c.name)}</span></label></td><td class="l"><span class="tag g">${esc(r.c.ind)}</span></td><td><b>${N(r.score,1)}</b> <span class="scoreb" style="width:${(r.score*.6).toFixed(0)}px"></span></td><td>${N(r.cov)}%</td>`+act.map(([k])=>{const p=r.ps[k];return p==null?'<td class="na">—</td>':`<td style="${heat(p,50)}">${esc(fmtV(k,r.c[k],false))}</td>`}).join('')+'</tr>';
+      h+=`<tr><td>${N(i+1)}</td><td class="name stick"><label style="display:inline-flex;gap:7px;align-items:center"><input type="checkbox" data-cmpbtn="${r.c.id}"><span class="lk" data-open="${r.c.id}">${esc(r.c.name)}</span></label></td><td class="l">${indTag(r.c)}</td><td><b>${N(r.score,1)}</b> <span class="scoreb" style="width:${(r.score*.6).toFixed(0)}px"></span></td><td>${N(r.cov)}%</td>`+act.map(([k])=>{const p=r.ps[k];return p==null?'<td class="na">—</td>':`<td style="${heat(p,50)}">${esc(fmtV(k,r.c[k],false))}</td>`}).join('')+'</tr>';
     });
     $('#sc-tw').innerHTML=h+'</tbody></table>';
     $('#sc-pg').innerHTML=res.length>s.lim?`${N(show.length)}/${N(res.length)}社を表示 <button class="btn sm" id="sc-more">さらに50社</button>`:'';
